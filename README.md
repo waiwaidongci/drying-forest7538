@@ -11,7 +11,7 @@ RandomForest回归、训练内特征子集交叉验证与留出集MAE。为槐�
 1. 业务总览：批次、样本、任务与批准交付账册。
 2. 干燥研究：创建/修改来源说明、查看样本、用真实业务字段追加记录；列表分页。
 3. 分析配置：冻结来源、参数和全部样本，进入Redis队列。
-4. 完整结果：真实算法摘要、专属诊断、全部CSV导出和可恢复失败态。
+4. 完整结果：真实算法摘要、专属诊断、全部CSV导出和可恢复失败态；含新工况覆盖检查。
 5. 工艺试验备忘：分析师草案→负责人批准→阅读者下载批准快照。
 6. 审计：登录、来源修改、任务worker完成、业务说明批准等事件。
 
@@ -70,6 +70,24 @@ RandomForest回归、训练内特征子集交叉验证与留出集MAE，全部�
 
 已知边界：只比较三个预定义特征子集，超参数由分析前固定；留出集不用于选择。置换重要性来自最后留出集，不可反复依据它改模再宣称独立验证。不含预测区间，不用于外推工艺。
 
+## 新工况覆盖检查
+
+完整结果页可为一次已完成研究批量检查新工况是否落在训练试件的凸包内。四项输入各自在训练范围内，
+合起来仍可能超出联合覆盖，因此逐条给出可核对的单条证明：
+
+- 可覆盖：给出至多五件训练试件及非负权重，权重之和精确为一；凸包边界算覆盖。
+- 不可覆盖：给出整数系数的线性界限 `c·输入 > C`，全部训练试件满足 `c·输入 ≤ C`，待判工况严格超出。
+
+判定按记录的十进制值精确进行：坐标按本次最大小数位（≤24 位）整数化，除零权重外不做浮点近似，
+全程不枚举训练试件组合。训练试件取自该研究创建时冻结快照的训练索引；受理后补录的样本不进入本次判定，
+依据以 SHA256 摘要绑定。接口 `GET/POST /runs/{id}/coverage` 与 `GET /runs/{id}/coverage/{batch_id}`：
+请求编号 `request_key` 在任务内唯一，重复提交同内容幂等、不同内容 409；访客只读，匿名 401。
+
+批次由独立 worker 逐条判定：受理即落库并返回 `queued`；每条证明与条目状态在同一事务写入，
+写入以认领令牌（条目 + 尝试次数）为条件，中断遗留的占用按租约退回、worker 重启立即回收自己的占用，
+因此中断可恢复、并发重试不重复入账。整批证明复核对齐后批次才置为 `verified`；
+在此之前列表显示进度，详情不返回任何单条证明，页面也不展示。审计记录 `coverage.queued/failed/verified`。
+
 ## 演示数据与一天剧本
 
 固定seed=42，3个来源 ` HX-202611-01/02/03`，每来源240条，共720条业务记录；三个账号和首轮种子任务。自然键检查后仅插入缺失数据，连跑seed不重复、不覆盖用户修改。`SEED_DEMO=true` 时启动自动执行；失败记录日志但不阻塞服务。首轮任务同样由独立worker真实计算。
@@ -105,4 +123,9 @@ backend/migrations/001_initial.sql
 
 共享枚举：`backend/src/constants/enums.py` 与 `frontend/src/constants/enums.js` 都定义 admin/analyst/viewer、queued/running/completed/failed、draft/approved。后端service检查对应字符串；README为全量值说明。共享前端组件table/status/chart/business跨总览、结果、配置与复核复用；actions hook和format utils负责交互/格式。后端errors与rate_limit是两个中间件。
 
-测试及截图在批根 `test-artifacts/gb-0044/`，不混入源码。独立算法oracle、HTTP完整流程和真实Playwright浏览器流程见该目录 `TESTING.md`。License：MIT。
+覆盖检查的精确求解在 `backend/src/services/convex.py`（分数-free 整数单纯形，Bland 反循环），
+业务编排在 `backend/src/services/coverage.py`，实体与表在 `models/coverage.py`（`coverage_batches`、
+`coverage_items`），前端在 `pages/coverage.js`。覆盖检查与结果共用同一条 worker 队列轮询，
+另有 10 秒一次的未完成批次扫描兜底。
+
+测试及截图在批根 `test-artifacts/gb-0044/`，不混入源码。独立算法oracle、HTTP完整流程和真实浏览器流程见该目录 `TESTING.md`。License：MIT。

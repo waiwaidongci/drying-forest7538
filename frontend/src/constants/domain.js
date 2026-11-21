@@ -105,6 +105,10 @@ export const domain = {
     "exhibit": "展品编号",
     "prediction": "预计评分",
     "method": "计算依据",
-    "neighbor_count": "参与邻居数"
+    "neighbor_count": "参与邻居数",
+    "weight": "权重",
+    "weight_decimal": "权重（小数）",
+    "training_index": "训练内序号",
+    "bound": "线性界限"
   }
 };

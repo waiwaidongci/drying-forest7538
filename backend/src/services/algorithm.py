@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split,KFold,cross_val_score
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import mean_absolute_error,mean_squared_error
 from .domain_validation import validate_parameters
-FEATURES=['moisture','thickness','temperature','airflow']
+from ..constants.enums import FEATURES
 SUBSETS=[['moisture','temperature'],['moisture','thickness','temperature'],FEATURES]
 def calculate(records,parameters):
     p=validate_parameters(parameters)
